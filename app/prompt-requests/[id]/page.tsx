@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -15,9 +16,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { FileText, ArrowLeft, Coins, CheckCircle, XCircle, RotateCcw } from "lucide-react";
+import { FileText, ArrowLeft, Coins, CheckCircle, XCircle, RotateCcw, History, Activity } from "lucide-react";
 
 export default function PromptRequestPage() {
   const params = useParams();
@@ -91,16 +94,16 @@ export default function PromptRequestPage() {
             Created {new Date(pr._creationTime).toLocaleDateString()}
           </p>
         </div>
-        <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
-          pr.status === "open" ? "bg-blue-100 text-blue-800" :
-          pr.status === "queued" ? "bg-yellow-100 text-yellow-800" :
-          pr.status === "in_progress" ? "bg-purple-100 text-purple-800" :
-          pr.status === "awaiting_review" ? "bg-orange-100 text-orange-800" :
-          pr.status === "approved" ? "bg-green-100 text-green-800" :
-          "bg-red-100 text-red-800"
-        }`}>
+        <Badge variant={
+          pr.status === "open" ? "default" :
+          pr.status === "queued" ? "secondary" :
+          pr.status === "in_progress" ? "secondary" :
+          pr.status === "awaiting_review" ? "outline" :
+          pr.status === "approved" ? "default" :
+          "destructive"
+        } className="text-sm px-3 py-1">
           {pr.status.replace("_", " ")}
-        </span>
+        </Badge>
       </div>
 
       {/* Description */}
@@ -109,7 +112,11 @@ export default function PromptRequestPage() {
           <CardTitle>Description</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="whitespace-pre-wrap">{pr.body}</p>
+          <Textarea 
+            value={pr.body} 
+            readOnly 
+            className="min-h-[120px] resize-none bg-muted"
+          />
         </CardContent>
       </Card>
 
@@ -163,134 +170,154 @@ export default function PromptRequestPage() {
         </Card>
       )}
 
-      {/* Runs */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Agent Runs</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!runs?.length ? (
-            <p className="text-muted-foreground">No runs yet. Add coins to trigger the first run!</p>
-          ) : (
-            <div className="space-y-4">
-              {runs.map((run: any) => (
-                <div key={run._id} className="border rounded-lg p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">Run #{run.runNumber}</h3>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                      run.status === "queued" ? "bg-yellow-100 text-yellow-800" :
-                      run.status === "running" ? "bg-purple-100 text-purple-800" :
-                      run.status === "completed" ? "bg-blue-100 text-blue-800" :
-                      run.status === "approved" ? "bg-green-100 text-green-800" :
-                      run.status === "rejected" ? "bg-red-100 text-red-800" :
-                      run.status === "rerun_requested" ? "bg-gray-100 text-gray-800" :
-                      "bg-gray-100 text-gray-800"
-                    }`}>
-                      {run.status.replace("_", " ")}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Triggered: {new Date(run.triggeredAt).toLocaleString()}
-                  </p>
-                  {run.completedAt && (
-                    <p className="text-sm text-muted-foreground">
-                      Completed: {new Date(run.completedAt).toLocaleString()}
-                    </p>
-                  )}
-                  {run.summary && <p className="text-sm">{run.summary}</p>}
-                  
-                  {run.status === "completed" && (
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1 text-green-600"
-                        onClick={() => approveMutation({ actorUserId: "placeholder" as any, runId: run._id })}
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1"
-                        onClick={() => rerunMutation({ actorUserId: "placeholder" as any, runId: run._id })}
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                        Rerun
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1 text-red-600"
-                        onClick={() => rejectMutation({ actorUserId: "placeholder" as any, runId: run._id })}
-                      >
-                        <XCircle className="h-4 w-4" />
-                        Reject
-                      </Button>
+      {/* Tabs for Runs, Votes, Audit */}
+      <Tabs defaultValue="runs" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="runs" className="gap-2">
+            <Activity className="h-4 w-4" />
+            Agent Runs
+          </TabsTrigger>
+          <TabsTrigger value="votes" className="gap-2">
+            <Coins className="h-4 w-4" />
+            Vote History
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="gap-2">
+            <History className="h-4 w-4" />
+            Audit Log
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="runs">
+          <Card>
+            <CardHeader>
+              <CardTitle>Agent Runs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!runs?.length ? (
+                <p className="text-muted-foreground">No runs yet. Add coins to trigger the first run!</p>
+              ) : (
+                <div className="space-y-4">
+                  {runs.map((run: any) => (
+                    <div key={run._id} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold">Run #{run.runNumber}</h3>
+                        <Badge variant={
+                          run.status === "queued" ? "secondary" :
+                          run.status === "running" ? "default" :
+                          run.status === "completed" ? "outline" :
+                          run.status === "approved" ? "default" :
+                          run.status === "rejected" ? "destructive" :
+                          "secondary"
+                        }>
+                          {run.status.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Triggered: {new Date(run.triggeredAt).toLocaleString()}
+                      </p>
+                      {run.completedAt && (
+                        <p className="text-sm text-muted-foreground">
+                          Completed: {new Date(run.completedAt).toLocaleString()}
+                        </p>
+                      )}
+                      {run.summary && <p className="text-sm">{run.summary}</p>}
+                      
+                      {run.status === "completed" && (
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1 text-green-600"
+                            onClick={() => approveMutation({ actorUserId: "placeholder" as any, runId: run._id })}
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => rerunMutation({ actorUserId: "placeholder" as any, runId: run._id })}
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            Rerun
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1 text-red-600"
+                            onClick={() => rejectMutation({ actorUserId: "placeholder" as any, runId: run._id })}
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Reject
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Vote History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Vote History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!votes?.length ? (
-            <p className="text-muted-foreground">No votes yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {votes.map((vote: any) => (
-                <div key={vote._id} className="flex justify-between items-center py-2 border-b last:border-0">
-                  <span className="text-sm">User {vote.userId.slice(0, 8)}...</span>
-                  <div className="flex gap-4 text-sm">
-                    <span>{vote.coins} coins</span>
-                    <span className="text-muted-foreground">{vote.remainingCoins} remaining</span>
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      vote.runAllocationStatus === "consumed_by_run" ? "bg-green-100 text-green-800" :
-                      vote.runAllocationStatus === "refunded" ? "bg-red-100 text-red-800" :
-                      "bg-gray-100 text-gray-800"
-                    }`}>
-                      {vote.runAllocationStatus.replace(/_/g, " ")}
-                    </span>
-                  </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="votes">
+          <Card>
+            <CardHeader>
+              <CardTitle>Vote History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!votes?.length ? (
+                <p className="text-muted-foreground">No votes yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {votes.map((vote: any) => (
+                    <div key={vote._id} className="flex justify-between items-center py-2 border-b last:border-0">
+                      <span className="text-sm">User {vote.userId.slice(0, 8)}...</span>
+                      <div className="flex gap-4 text-sm">
+                        <span>{vote.coins} coins</span>
+                        <span className="text-muted-foreground">{vote.remainingCoins} remaining</span>
+                        <Badge variant={
+                          vote.runAllocationStatus === "consumed_by_run" ? "default" :
+                          vote.runAllocationStatus === "refunded" ? "destructive" :
+                          "secondary"
+                        } className="text-xs">
+                          {vote.runAllocationStatus.replace(/_/g, " ")}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Audit Log */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Audit Log</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!audit?.length ? (
-            <p className="text-muted-foreground">No activity yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {audit.map((entry: any) => (
-                <div key={entry._id} className="text-sm py-1 border-b last:border-0">
-                  <span className="font-medium">{entry.action.replace(/\./g, " ")}</span>
-                  {entry.details && <span className="text-muted-foreground"> • {entry.details}</span>}
-                  <span className="text-muted-foreground float-right">
-                    {new Date(entry._creationTime).toLocaleString()}
-                  </span>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="audit">
+          <Card>
+            <CardHeader>
+              <CardTitle>Audit Log</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!audit?.length ? (
+                <p className="text-muted-foreground">No activity yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {audit.map((entry: any) => (
+                    <div key={entry._id} className="text-sm py-1 border-b last:border-0">
+                      <span className="font-medium">{entry.action.replace(/\./g, " ")}</span>
+                      {entry.details && <span className="text-muted-foreground"> • {entry.details}</span>}
+                      <span className="text-muted-foreground float-right">
+                        {new Date(entry._creationTime).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

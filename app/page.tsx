@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { FolderGit, FileText, Coins, GitBranch } from "lucide-react";
 
 const COIN_PACKS = [
@@ -116,16 +117,16 @@ export default function HomePage() {
                   <CardHeader>
                     <CardTitle className="text-lg">{pr.title}</CardTitle>
                     <CardDescription>
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        pr.status === "open" ? "bg-blue-100 text-blue-800" :
-                        pr.status === "queued" ? "bg-yellow-100 text-yellow-800" :
-                        pr.status === "in_progress" ? "bg-purple-100 text-purple-800" :
-                        pr.status === "awaiting_review" ? "bg-orange-100 text-orange-800" :
-                        pr.status === "approved" ? "bg-green-100 text-green-800" :
-                        "bg-red-100 text-red-800"
-                      }`}>
+                      <Badge variant={
+                        pr.status === "open" ? "default" :
+                        pr.status === "queued" ? "secondary" :
+                        pr.status === "in_progress" ? "secondary" :
+                        pr.status === "awaiting_review" ? "secondary" :
+                        pr.status === "approved" ? "default" :
+                        "destructive"
+                      }>
                         {pr.status.replace("_", " ")}
-                      </span>
+                      </Badge>
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">

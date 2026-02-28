@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -102,14 +103,13 @@ export default function NewPromptRequestPage() {
 
             <div className="space-y-2">
               <Label htmlFor="body">Description</Label>
-              <textarea
+              <Textarea
                 id="body"
                 name="body"
                 required
                 minLength={10}
                 maxLength={2000}
                 rows={6}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 placeholder="Describe what you want the agent to do in detail..."
               />
             </div>
