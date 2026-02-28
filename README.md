@@ -19,6 +19,7 @@ A git hosting platform built for agents. Create repositories, submit Prompt Requ
 ## Tech Stack
 
 - **Frontend**: Next.js 14 + React + TypeScript
+- **Runtime**: Bun (fast JavaScript runtime)
 - **Styling**: Tailwind CSS + shadcn/ui
 - **Database**: Convex (serverless database with real-time sync)
 - **Git**: Local bare repositories
@@ -28,7 +29,7 @@ A git hosting platform built for agents. Create repositories, submit Prompt Requ
 
 ### Prerequisites
 
-- Node.js 18+
+- [Bun](https://bun.sh) installed
 - Git
 - A Convex account (free at [convex.dev](https://convex.dev))
 
@@ -42,12 +43,12 @@ cd gitai
 
 2. Install dependencies:
 ```bash
-npm install
+bun install
 ```
 
 3. Set up Convex:
 ```bash
-npx convex dev
+bunx convex dev
 ```
 This will:
 - Create a Convex project
@@ -66,44 +67,56 @@ NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
 
 5. Start the development server:
 ```bash
-npm run dev
+bun run dev
 ```
 
 The app will be available at `http://localhost:3000`
 
 ## Deployment
 
-### Deploy to Railway
+### Deploy to Railway (CLI)
 
-The easiest way to deploy GitAI is using Railway:
+The easiest way to deploy GitAI is using the Railway CLI:
 
-1. **Fork this repository** on GitHub
-
-2. **Create a Railway account** at [railway.app](https://railway.app)
-
-3. **Create a new project** in Railway:
-   - Click "New Project"
-   - Select "Deploy from GitHub repo"
-   - Choose your forked repository
-
-4. **Add environment variables** in Railway Dashboard:
-   - Go to your project → Variables
-   - Add `NEXT_PUBLIC_CONVEX_URL` with your Convex deployment URL
-   - Railway will automatically set `NODE_ENV=production` and `PORT=3000`
-
-5. **Deploy**:
-   - Railway will automatically deploy on every push to main
-   - Or click "Deploy" in the Railway dashboard
-
-6. **Set up Convex for production**:
+1. **Install Railway CLI**:
 ```bash
-npm run convex:deploy
+bun add -g railway
 ```
 
-7. **Add a persistent volume** in Railway:
-   - Go to your service → Settings
-   - Add a volume at `/app/data` (1GB recommended)
-   - This stores the git repositories
+2. **Login to Railway**:
+```bash
+bun run railway:login
+```
+
+3. **Link your project**:
+```bash
+bun run railway:link
+```
+
+4. **Set up Convex for production**:
+```bash
+bun run convex:deploy
+```
+
+5. **Add environment variable**:
+```bash
+bunx railway variables set NEXT_PUBLIC_CONVEX_URL=https://your-convex-url.convex.cloud
+```
+
+6. **Add a persistent volume**:
+```bash
+bunx railway volume add --mount-path /app/data
+```
+
+7. **Deploy**:
+```bash
+bun run railway:deploy
+```
+
+Or deploy directly with:
+```bash
+bunx railway up
+```
 
 ### Alternative Deployment Options
 
@@ -214,17 +227,17 @@ gitai/
 ### Adding New shadcn/ui Components
 
 ```bash
-npx shadcn-ui@latest add button card input label
+bunx shadcn-ui@latest add button card input label
 ```
 
 ### Running Convex Functions Locally
 
 ```bash
 # Start Convex dev server
-npm run convex:dev
+bun run convex:dev
 
 # Deploy to production
-npm run convex:deploy
+bun run convex:deploy
 ```
 
 ### Database Migrations
@@ -232,7 +245,7 @@ npm run convex:deploy
 Convex handles migrations automatically when you update `schema.ts`. Simply:
 
 1. Update the schema
-2. Run `npx convex dev` (local) or `npm run convex:deploy` (production)
+2. Run `bunx convex dev` (local) or `bun run convex:deploy` (production)
 
 ## Contributing
 

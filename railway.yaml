@@ -4,8 +4,8 @@ services:
     runtime: node
     region: oregon
     plan: starter
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
+    buildCommand: bun install && bun run build
+    startCommand: bun run start
     healthCheckPath: /
     envVars:
       - key: NODE_ENV
