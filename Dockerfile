@@ -17,6 +17,7 @@ COPY . .
 
 # Build the application
 ENV NEXT_TELEMETRY_DISABLED 1
+RUN mkdir -p /app/public
 RUN bun run build
 
 # Production image, copy all the files and run next
@@ -29,7 +30,8 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN groupadd --system --gid 1001 bunjs
 RUN useradd --system --uid 1001 nextjs
 
-# Copy necessary files
+# Copy necessary files (create public if it doesn't exist)
+RUN mkdir -p /app/public
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
