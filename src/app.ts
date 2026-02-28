@@ -77,12 +77,29 @@ export class AppService {
     return this.db.prepare("SELECT * FROM users WHERE username = ?").get(username) as User | undefined;
   }
 
-  getUserById(userId: number) {
-    return this.db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as User | undefined;
+  getUserById(userId: number): User | undefined {
+    const row = this.db.prepare("SELECT * FROM users WHERE id = ?").get(userId) as any;
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      username: row.username,
+      email: row.email,
+      starterCoinsGrantedAt: row.starter_coins_granted_at,
+      role: row.role,
+      createdAt: row.created_at,
+    } as User;
   }
 
   getWallet(userId: number) {
-    return this.db.prepare("SELECT * FROM wallets WHERE user_id = ?").get(userId) as Wallet | undefined;
+    const row = this.db.prepare("SELECT * FROM wallets WHERE user_id = ?").get(userId) as any;
+    if (!row) return undefined;
+    return {
+      userId: row.user_id,
+      availableCoins: row.available_coins,
+      lifetimeCoinsPurchased: row.lifetime_coins_purchased,
+      lifetimeCoinsGranted: row.lifetime_coins_granted,
+      lifetimeCoinsSpent: row.lifetime_coins_spent,
+    } as Wallet;
   }
 
   getWalletTransactions(userId: number) {
@@ -136,12 +153,32 @@ export class AppService {
     `).all() as Array<Repository & { maintainer_username: string; prompt_request_count: number; total_demand: number }>;
   }
 
-  getRepositoryById(repositoryId: number) {
-    return this.db.prepare("SELECT * FROM repositories WHERE id = ?").get(repositoryId) as Repository | undefined;
+  private mapRepository(row: any): Repository {
+    return {
+      id: row.id,
+      slug: row.slug,
+      name: row.name,
+      description: row.description,
+      visibility: row.visibility,
+      maintainerUserId: row.maintainer_user_id,
+      bareRepoPath: row.bare_repo_path,
+      cloneUrl: row.clone_url,
+      defaultBranch: row.default_branch,
+      agentEnabled: row.agent_enabled,
+      createdAt: row.created_at,
+    } as Repository;
   }
 
-  getRepositoryBySlug(slug: string) {
-    return this.db.prepare("SELECT * FROM repositories WHERE slug = ?").get(slug) as Repository | undefined;
+  getRepositoryById(repositoryId: number): Repository | undefined {
+    const row = this.db.prepare("SELECT * FROM repositories WHERE id = ?").get(repositoryId) as any;
+    if (!row) return undefined;
+    return this.mapRepository(row);
+  }
+
+  getRepositoryBySlug(slug: string): Repository | undefined {
+    const row = this.db.prepare("SELECT * FROM repositories WHERE slug = ?").get(slug) as any;
+    if (!row) return undefined;
+    return this.mapRepository(row);
   }
 
   getRepositoryDetails(slug: string) {
@@ -190,12 +227,26 @@ export class AppService {
     return this.getPromptRequestById(promptRequestId);
   }
 
-  getPromptRequestById(promptRequestId: number) {
-    return this.db.prepare("SELECT * FROM prompt_requests WHERE id = ?").get(promptRequestId) as PromptRequest | undefined;
+  getPromptRequestById(promptRequestId: number): PromptRequest | undefined {
+    const row = this.db.prepare("SELECT * FROM prompt_requests WHERE id = ?").get(promptRequestId) as any;
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      repositoryId: row.repository_id,
+      authorUserId: row.author_user_id,
+      title: row.title,
+      body: row.body,
+      status: row.status,
+      totalCoinsCommitted: row.total_coins_committed,
+      coinsAvailableForNextRun: row.coins_available_for_next_run,
+      currentRunNumber: row.current_run_number,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    } as PromptRequest;
   }
 
   getPromptRequestDetails(promptRequestId: number) {
-    const promptRequest = this.db.prepare(`
+    const row = this.db.prepare(`
       SELECT
         prompt_requests.*,
         repositories.slug AS repository_slug,
@@ -206,20 +257,31 @@ export class AppService {
       JOIN repositories ON repositories.id = prompt_requests.repository_id
       JOIN users ON users.id = prompt_requests.author_user_id
       WHERE prompt_requests.id = ?
-    `).get(promptRequestId) as
-      | (PromptRequest & {
-          repository_slug: string;
-          repository_name: string;
-          maintainer_user_id: number;
-          author_username: string;
-        })
-      | undefined;
+    `).get(promptRequestId) as any;
 
-    if (!promptRequest) {
+    if (!row) {
       return undefined;
     }
 
-    const votes = this.db.prepare(`
+    const promptRequest = {
+      id: row.id,
+      repositoryId: row.repository_id,
+      authorUserId: row.author_user_id,
+      title: row.title,
+      body: row.body,
+      status: row.status,
+      totalCoinsCommitted: row.total_coins_committed,
+      coinsAvailableForNextRun: row.coins_available_for_next_run,
+      currentRunNumber: row.current_run_number,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      repository_slug: row.repository_slug,
+      repository_name: row.repository_name,
+      maintainer_user_id: row.maintainer_user_id,
+      author_username: row.author_username,
+    };
+
+    const voteRows = this.db.prepare(`
       SELECT
         prompt_request_votes.*,
         users.username
@@ -227,15 +289,43 @@ export class AppService {
       JOIN users ON users.id = prompt_request_votes.user_id
       WHERE prompt_request_id = ?
       ORDER BY prompt_request_votes.id ASC
-    `).all(promptRequestId) as Array<PromptRequestVote & { username: string }>;
+    `).all(promptRequestId) as any[];
 
-    const runs = this.db.prepare(`
+    const votes = voteRows.map((v) => ({
+      id: v.id,
+      promptRequestId: v.prompt_request_id,
+      userId: v.user_id,
+      coins: v.coins,
+      remainingCoins: v.remaining_coins,
+      runAllocationStatus: v.run_allocation_status,
+      runId: v.run_id,
+      createdAt: v.created_at,
+      refundedAt: v.refunded_at,
+      username: v.username,
+    }));
+
+    const runRows = this.db.prepare(`
       SELECT * FROM agent_runs
       WHERE prompt_request_id = ?
       ORDER BY run_number DESC
-    `).all(promptRequestId) as AgentRun[];
+    `).all(promptRequestId) as any[];
 
-    const audit = this.db.prepare(`
+    const runs = runRows.map((r) => ({
+      id: r.id,
+      promptRequestId: r.prompt_request_id,
+      runNumber: r.run_number,
+      status: r.status,
+      coinsConsumed: r.coins_consumed,
+      triggeredAt: r.triggered_at,
+      completedAt: r.completed_at,
+      reviewedAt: r.reviewed_at,
+      artifactUrl: r.artifact_url,
+      resultPayload: r.result_payload,
+      summary: r.summary,
+      failureReason: r.failure_reason,
+    }));
+
+    const auditRows = this.db.prepare(`
       SELECT
         audit_log.*,
         users.username
@@ -244,7 +334,19 @@ export class AppService {
       WHERE prompt_request_id = ?
       ORDER BY audit_log.id DESC
       LIMIT 20
-    `).all(promptRequestId) as Array<AuditLogEntry & { username: string }>;
+    `).all(promptRequestId) as any[];
+
+    const audit = auditRows.map((a) => ({
+      id: a.id,
+      actorUserId: a.actor_user_id,
+      repositoryId: a.repository_id,
+      promptRequestId: a.prompt_request_id,
+      runId: a.run_id,
+      action: a.action,
+      details: a.details,
+      createdAt: a.created_at,
+      username: a.username,
+    }));
 
     return { promptRequest, votes, runs, audit };
   }
@@ -347,25 +449,25 @@ export class AppService {
       const runId = Number(result.lastInsertRowid);
 
       let remaining = RUN_THRESHOLD_COINS;
-      const votes = this.db.prepare(`
+      const voteRows = this.db.prepare(`
         SELECT * FROM prompt_request_votes
         WHERE prompt_request_id = ?
           AND remaining_coins > 0
           AND refunded_at IS NULL
         ORDER BY id ASC
-      `).all(refreshed.id) as PromptRequestVote[];
+      `).all(refreshed.id) as any[];
 
-      for (const vote of votes) {
+      for (const voteRow of voteRows) {
         if (remaining <= 0) {
           break;
         }
-        const allocate = Math.min(vote.remainingCoins, remaining);
+        const allocate = Math.min(voteRow.remaining_coins, remaining);
         this.db.prepare(`
           INSERT INTO run_vote_allocations (run_id, vote_id, user_id, coins_allocated)
           VALUES (?, ?, ?, ?)
-        `).run(runId, vote.id, vote.userId, allocate);
+        `).run(runId, voteRow.id, voteRow.user_id, allocate);
 
-        const newRemaining = vote.remainingCoins - allocate;
+        const newRemaining = voteRow.remaining_coins - allocate;
         this.db.prepare(`
           UPDATE prompt_request_votes
           SET remaining_coins = ?,
@@ -378,7 +480,7 @@ export class AppService {
                 ELSE run_id
               END
           WHERE id = ?
-        `).run(newRemaining, newRemaining, newRemaining, runId, vote.id);
+        `).run(newRemaining, newRemaining, newRemaining, runId, voteRow.id);
         remaining -= allocate;
       }
 
@@ -646,8 +748,23 @@ export class AppService {
     tx();
   }
 
-  getRun(runId: number) {
-    return this.db.prepare("SELECT * FROM agent_runs WHERE id = ?").get(runId) as AgentRun | undefined;
+  getRun(runId: number): AgentRun | undefined {
+    const row = this.db.prepare("SELECT * FROM agent_runs WHERE id = ?").get(runId) as any;
+    if (!row) return undefined;
+    return {
+      id: row.id,
+      promptRequestId: row.prompt_request_id,
+      runNumber: row.run_number,
+      status: row.status,
+      coinsConsumed: row.coins_consumed,
+      triggeredAt: row.triggered_at,
+      completedAt: row.completed_at,
+      reviewedAt: row.reviewed_at,
+      artifactUrl: row.artifact_url,
+      resultPayload: row.result_payload,
+      summary: row.summary,
+      failureReason: row.failure_reason,
+    } as AgentRun;
   }
 
   getHomeData() {

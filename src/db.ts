@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import Database from "better-sqlite3";
-import { DB_PATH, DATA_DIR } from "./config.js";
+import { DB_PATH, DATA_DIR, REPOS_DIR, WORK_DIR } from "./config.js";
 
 let database: Database.Database | null = null;
 
@@ -151,6 +151,13 @@ export function resetDbForTests() {
   }
   if (fs.existsSync(DB_PATH)) {
     fs.rmSync(DB_PATH);
+  }
+  // Clear repos and work directories for clean test state
+  if (fs.existsSync(REPOS_DIR)) {
+    fs.rmSync(REPOS_DIR, { recursive: true, force: true });
+  }
+  if (fs.existsSync(WORK_DIR)) {
+    fs.rmSync(WORK_DIR, { recursive: true, force: true });
   }
 }
 

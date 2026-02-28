@@ -393,9 +393,230 @@ The product is successful if a user can:
 
 The implementation should optimize for correctness of the state machine and simplicity of hosting, not for production-scale git infrastructure.
 
-“Built for agents” in v1 means:
+"Built for agents" in v1 means:
 
 - repositories are the center of the product
 - Prompt Requests are native to the repository
 - agent work is triggered by demand, not manual ticket triage
 - maintainer review is integrated into the same repository flow
+
+## Appendix A: Database Schema Reference
+
+### users
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| username | TEXT | NOT NULL UNIQUE |
+| email | TEXT | NOT NULL UNIQUE |
+| starter_coins_granted_at | TEXT | nullable |
+| role | TEXT | NOT NULL DEFAULT 'user' |
+| created_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP |
+
+### wallets
+| Column | Type | Constraints |
+|--------|------|-------------|
+| user_id | INTEGER | PRIMARY KEY, FOREIGN KEY users(id) |
+| available_coins | INTEGER | NOT NULL DEFAULT 0 CHECK (>= 0) |
+| lifetime_coins_purchased | INTEGER | NOT NULL DEFAULT 0 |
+| lifetime_coins_granted | INTEGER | NOT NULL DEFAULT 0 |
+| lifetime_coins_spent | INTEGER | NOT NULL DEFAULT 0 |
+
+### wallet_transactions
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| user_id | INTEGER | NOT NULL, FOREIGN KEY users(id) |
+| type | TEXT | NOT NULL |
+| coins_delta | INTEGER | NOT NULL |
+| usd_amount_cents | INTEGER | nullable |
+| prompt_request_id | INTEGER | nullable |
+| run_id | INTEGER | nullable |
+| metadata | TEXT | nullable |
+| created_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP |
+
+### repositories
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| slug | TEXT | NOT NULL UNIQUE |
+| name | TEXT | NOT NULL |
+| description | TEXT | NOT NULL |
+| visibility | TEXT | NOT NULL DEFAULT 'public' |
+| maintainer_user_id | INTEGER | NOT NULL, FOREIGN KEY users(id) |
+| bare_repo_path | TEXT | NOT NULL UNIQUE |
+| clone_url | TEXT | NOT NULL |
+| default_branch | TEXT | NOT NULL DEFAULT 'main' |
+| agent_enabled | INTEGER | NOT NULL DEFAULT 1 |
+| created_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP |
+
+### prompt_requests
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| repository_id | INTEGER | NOT NULL, FOREIGN KEY repositories(id) |
+| author_user_id | INTEGER | NOT NULL, FOREIGN KEY users(id) |
+| title | TEXT | NOT NULL |
+| body | TEXT | NOT NULL |
+| status | TEXT | NOT NULL DEFAULT 'open' |
+| total_coins_committed | INTEGER | NOT NULL DEFAULT 0 |
+| coins_available_for_next_run | INTEGER | NOT NULL DEFAULT 0 |
+| current_run_number | INTEGER | NOT NULL DEFAULT 0 |
+| created_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP |
+| updated_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP |
+
+### prompt_request_votes
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| prompt_request_id | INTEGER | NOT NULL, FOREIGN KEY prompt_requests(id) |
+| user_id | INTEGER | NOT NULL, FOREIGN KEY users(id) |
+| coins | INTEGER | NOT NULL CHECK (> 0) |
+| remaining_coins | INTEGER | NOT NULL CHECK (>= 0) |
+| run_allocation_status | TEXT | NOT NULL DEFAULT 'reserved_for_future' |
+| run_id | INTEGER | nullable |
+| created_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP |
+| refunded_at | TEXT | nullable |
+
+### agent_runs
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| prompt_request_id | INTEGER | NOT NULL, FOREIGN KEY prompt_requests(id) |
+| run_number | INTEGER | NOT NULL |
+| status | TEXT | NOT NULL DEFAULT 'queued' |
+| coins_consumed | INTEGER | NOT NULL |
+| triggered_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP |
+| completed_at | TEXT | nullable |
+| reviewed_at | TEXT | nullable |
+| artifact_url | TEXT | nullable |
+| result_payload | TEXT | nullable |
+| summary | TEXT | nullable |
+| failure_reason | TEXT | nullable |
+| UNIQUE | (prompt_request_id, run_number) |
+
+### run_vote_allocations
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| run_id | INTEGER | NOT NULL, FOREIGN KEY agent_runs(id) |
+| vote_id | INTEGER | NOT NULL, FOREIGN KEY prompt_request_votes(id) |
+| user_id | INTEGER | NOT NULL, FOREIGN KEY users(id) |
+| coins_allocated | INTEGER | NOT NULL CHECK (> 0) |
+| refunded_at | TEXT | nullable |
+| UNIQUE | (run_id, vote_id) |
+
+### audit_log
+| Column | Type | Constraints |
+|--------|------|-------------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT |
+| actor_user_id | INTEGER | NOT NULL, FOREIGN KEY users(id) |
+| repository_id | INTEGER | nullable |
+| prompt_request_id | INTEGER | nullable |
+| run_id | INTEGER | nullable |
+| action | TEXT | NOT NULL |
+| details | TEXT | nullable |
+| created_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP |
+
+### Indexes
+- idx_prompt_requests_repository: (repository_id, created_at DESC)
+- idx_votes_request: (prompt_request_id, created_at ASC)
+- idx_runs_request: (prompt_request_id, run_number DESC)
+- idx_audit_log_request: (prompt_request_id, created_at DESC)
+
+## Appendix B: Configuration Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| STARTER_COINS | 50 | Coins granted to new users |
+| RUN_THRESHOLD_COINS | 10 | Coins needed to trigger an agent run |
+| COINS_PER_DOLLAR | 10 | Exchange rate for purchases |
+| DATA_DIR | ./data | Local data storage path |
+| REPOS_DIR | ./data/repos | Bare repository storage |
+| WORK_DIR | ./data/work | Temporary working directory |
+
+### Coin Packs
+| ID | Coins | USD |
+|----|-------|-----|
+| starter-100 | 100 | $10 |
+| builder-500 | 500 | $50 |
+| shipper-1000 | 1000 | $100 |
+
+## Appendix C: State Machine Diagrams
+
+### Prompt Request Status Flow
+```
+open -> queued -> in_progress -> awaiting_review -> approved
+  ^                                    |
+  |                                    v
+  +------------- rerun_requested <-----+
+                                    |
+                                    v
+                                 rejected
+```
+
+### Agent Run Status Flow
+```
+queued -> running -> completed -> approved
+            |           |
+            v           v
+          failed   rerun_requested
+                        |
+                        v
+                     rejected
+```
+
+## Appendix D: File Structure
+
+```
+gitai/
+├── data/
+│   ├── repos/           # Bare git repositories
+│   ├── work/            # Temporary working directories
+│   └── gitai.sqlite     # SQLite database
+├── src/
+│   ├── app.ts           # AppService business logic
+│   ├── config.ts        # Configuration constants
+│   ├── db.ts            # Database initialization
+│   ├── git.ts           # Git operations
+│   ├── types.ts         # TypeScript type definitions
+│   └── server.ts        # HTTP server (to be implemented)
+├── SPEC.md              # This specification
+├── package.json
+└── tsconfig.json
+```
+
+## Appendix E: Error Codes
+
+| Error | HTTP Status | Description |
+|-------|-------------|-------------|
+| User not found | 404 | User does not exist |
+| Wallet not found | 404 | Wallet not initialized |
+| Not enough coins | 400 | Insufficient balance for vote |
+| Repository not found | 404 | Repository does not exist |
+| Prompt Request not found | 404 | Request does not exist |
+| Run not found | 404 | Agent run does not exist |
+| Maintainer access required | 403 | User is not repository maintainer |
+| Prompt Request closed | 400 | Cannot vote on closed/terminal request |
+| Run not reviewable | 400 | Run status prevents review action |
+| Coin pack not found | 404 | Invalid purchase option |
+
+## Appendix F: Future Roadmap (Post-v1)
+
+### v2 Considerations
+- Private repositories
+- SSH git transport
+- HTTP smart git protocol
+- Webhook integrations
+- Multiple agents with specializations
+- Human-submitted contributions
+- CI/CD pipeline integration
+- Revenue sharing with maintainers
+
+### v3+ Ideas
+- Team/organization support
+- Advanced permissions
+- Branch protection rules
+- Marketplace for agent skills
+- Analytics and insights dashboard
+
+(End of file - total 615 lines)

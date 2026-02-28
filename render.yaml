@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: gitai
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CONVEX_URL
+        sync: false
+    disk:
+      name: gitai-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
